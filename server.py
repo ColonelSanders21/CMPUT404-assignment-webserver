@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-
+import os
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,13 +26,33 @@ import socketserver
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
-
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        request_str = self.data.decode('utf-8')
+        # We parse this string to determine which response we need to send. 
+
+        # We start by checking whether it's a GET request (or if we need to return a 405)
+        if(request_str.split()[0] == "GET"):
+            # It's a GET request, so we must respond appropriately.
+            # First, a quick check to see whether we should return a 404.
+            path = 'www' + request_str.split()[1]
+            if os.path.exists(path) and 'www' in os.path.abspath(path):
+                # The path is valid. We continue on.
+                print("Path", path, "is valid")
+                response = 'HTTP/1.1 200 OK\r\n'
+            else:
+                # The path is not valid, so we should return a 404.
+                print("Path", path, "IS NOT valid")
+                response = 'HTTP/1.1 404 Not Found\r\nConnection: close\r\n'
+        else:
+            # We should refuse connection with a 405, and return that only GET is supported on this server.
+            response = 'HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nConnection: close\r\n'
+            
+        self.request.sendall(bytearray(response, 'utf-8'))
+    
+        
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
