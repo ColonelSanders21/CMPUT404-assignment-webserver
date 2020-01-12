@@ -31,20 +31,44 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         request_str = self.data.decode('utf-8')
+        print(request_str, '\n')
         # We parse this string to determine which response we need to send. 
 
         # We start by checking whether it's a GET request (or if we need to return a 405)
-        if(request_str.split()[0] == "GET"):
+        if(request_str.split(' ')[0] == "GET"):
             # It's a GET request, so we must respond appropriately.
             # First, a quick check to see whether we should return a 404.
             path = 'www' + request_str.split()[1]
             if os.path.exists(path) and 'www' in os.path.abspath(path):
                 # The path is valid. We continue on.
-                print("Path", path, "is valid")
-                response = 'HTTP/1.1 200 OK\r\n'
+
+                # We want to redirect via 301 when the path to the resource is not an actual file.
+                # ie. /deep --> /deep/
+                if '.' not in path:
+                    if path[-1] != '/':
+                        # We need to redirect via 301.
+                        response = 'HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8080' + path[3:] + '/\r\n'
+                    else:
+                        # Since the request path ends in /, we send the index.html of that directory.
+                        index_file = open((path + 'index.html'), 'r')
+                        index_text = index_file.read()
+                        index_file.close()
+                        response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\n' + index_text
+                        
+                else:
+                    # A file was requested specifically, so we should just return that file. We know it exists from earlier tests.
+                    # But we have to consider the mime type.
+                    filetype = path.split('.')[-1]
+                    if filetype == 'html':
+                        mimetype = 'text/html'
+                    else:
+                        mimetype = 'text/css'
+                    page_file = open(path, 'r')
+                    page_text = page_file.read()
+                    page_file.close()
+                    response = 'HTTP/1.1 200 OK\r\nContent-Type: ' + mimetype + '\r\n\n' + page_text
             else:
                 # The path is not valid, so we should return a 404.
-                print("Path", path, "IS NOT valid")
                 response = 'HTTP/1.1 404 Not Found\r\nConnection: close\r\n'
         else:
             # We should refuse connection with a 405, and return that only GET is supported on this server.
