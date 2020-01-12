@@ -31,7 +31,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         request_str = self.data.decode('utf-8')
-        print(request_str, '\n')
         # We parse this string to determine which response we need to send. 
 
         # We start by checking whether it's a GET request (or if we need to return a 405)
@@ -44,7 +43,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
                 # We want to redirect via 301 when the path to the resource is not an actual file.
                 # ie. /deep --> /deep/
-                if '.' not in path:
+                if not os.path.isfile(path):
                     if path[-1] != '/':
                         # We need to redirect via 301.
                         response = 'HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8080' + path[3:] + '/\r\n'
