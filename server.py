@@ -37,8 +37,13 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if(request_str.split(' ')[0] == "GET"):
             # It's a GET request, so we must respond appropriately.
             # First, a quick check to see whether we should return a 404.
+            
+            # We need to check if people are trying to escape the paths we allow access to.
+            # So we cache the default path to the www folder and compare this to the path the user requested
+            # to see if they're trying to pull a fast one.
+            allowed_directory = os.path.abspath('www')
             path = 'www' + request_str.split()[1]
-            if os.path.exists(path) and 'www' in os.path.abspath(path):
+            if os.path.exists(path) and (os.path.abspath(path)[:len(allowed_directory)] == allowed_directory):
                 # The path is valid. We continue on.
 
                 # We want to redirect via 301 when the path to the resource is not an actual file.
