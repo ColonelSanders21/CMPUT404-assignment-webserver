@@ -27,57 +27,84 @@ import os
 # try: curl -v -X GET http://127.0.0.1:8080/
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+    def handle_405(self, request_str):
+        # Test to determine whether or not we need to return a 405. 
+        # If we should, it returns the appropriate response message.
+        # Else, it returns False.
+
+        # We just check to see if it's a GET request.
+        if(request_str.split(' ')[0] == "GET"):
+            return False
+        response = 'HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nConnection: close\r\n'
+        return response
+
+    def handle_404(self,request_str):
+        # Test to determine whether to send a 404.
+        # If we should, it returns the appropriate response message.
+        # Else, it returns False.
+
+        # In a nutshell: check to see if the requested path is:
+        # A) to a file or folder that actually exists
+        # B) to a file or folder contained within www
+        # If one or both of these are not the case then we should send a 404.
+
+        allowed = os.path.abspath('www') # This is the path to our www folder
+        path = 'www' + request_str.split()[1] # This gives a path to resource the HTTP request is requesting
+        if os.path.exists(path) and (os.path.abspath(path)[:len(allowed)] == allowed):
+            # If the path points to a valid resource, and the absolute path leads to something in the appropriate www folder
+            return False
+        response = 'HTTP/1.1 404 Not Found\r\nConnection: close\r\n'
+        return response
+
+    def handle_301(self, request_str):
+        # Test to determine whether to send a 301.
+        # If we should, it returns a 301 reponse.
+        # Else, returns False.
+        path = 'www' + request_str.split()[1]
+        if os.path.isfile(path):
+            return False # They're requesting a file that is where they say it is. So we should just be sending a 200 OK.
+        if path[-1] == '/':
+            return False # We just need to return the index.html from this folder. We will do this in handle_200
+        response = 'HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8080' + path[3:] + '/\r\n'
+        return response
+
+    def handle_200(self, request_str):
+        # We have passed all the other tests, so we send a 200 OK.
+        # Returns our response.
+        path = 'www' + request_str.split()[1]
+        if path[-1] == '/':
+            # We return index.html from that folder.
+            index_file = open((path + 'index.html'), 'r')
+            index_text = index_file.read()
+            index_file.close()
+            response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\n' + index_text
+            return response
+        filetype = path.split('.')[-1]
+        if filetype == 'html':
+            mimetype = 'text/html'
+        else:
+            mimetype = 'text/css'
+        page_file = open(path, 'r')
+        page_text = page_file.read()
+        page_file.close()
+        response = 'HTTP/1.1 200 OK\r\nContent-Type: ' + mimetype + '\r\n\n' + page_text
+        return response
+
     def handle(self):
         self.data = self.request.recv(1024).strip()
         request_str = self.data.decode('utf-8')
         # We parse this string to determine which response we need to send. 
 
-        # We start by checking whether it's a GET request (or if we need to return a 405)
-        if(request_str.split(' ')[0] == "GET"):
-            # It's a GET request, so we must respond appropriately.
-            # First, a quick check to see whether we should return a 404.
-            
-            # We need to check if people are trying to escape the paths we allow access to.
-            # So we cache the default path to the www folder and compare this to the path the user requested
-            # to see if they're trying to pull a fast one.
-            allowed_directory = os.path.abspath('www')
-            path = 'www' + request_str.split()[1]
-            if os.path.exists(path) and (os.path.abspath(path)[:len(allowed_directory)] == allowed_directory):
-                # The path is valid. We continue on.
-
-                # We want to redirect via 301 when the path to the resource is not an actual file.
-                # ie. /deep --> /deep/
-                if not os.path.isfile(path):
-                    if path[-1] != '/':
-                        # We need to redirect via 301.
-                        response = 'HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8080' + path[3:] + '/\r\n'
-                    else:
-                        # Since the request path ends in /, we send the index.html of that directory.
-                        index_file = open((path + 'index.html'), 'r')
-                        index_text = index_file.read()
-                        index_file.close()
-                        response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\n' + index_text
-                        
-                else:
-                    # A file was requested specifically, so we should just return that file. We know it exists from earlier tests.
-                    # But we have to consider the mime type.
-                    filetype = path.split('.')[-1]
-                    if filetype == 'html':
-                        mimetype = 'text/html'
-                    else:
-                        mimetype = 'text/css'
-                    page_file = open(path, 'r')
-                    page_text = page_file.read()
-                    page_file.close()
-                    response = 'HTTP/1.1 200 OK\r\nContent-Type: ' + mimetype + '\r\n\n' + page_text
-            else:
-                # The path is not valid, so we should return a 404.
-                response = 'HTTP/1.1 404 Not Found\r\nConnection: close\r\n'
-        else:
-            # We should refuse connection with a 405, and return that only GET is supported on this server.
-            response = 'HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nConnection: close\r\n'
-            
+        # We run a few methods to determine if a certain reponse is necessary. If it is, we return the response they return.
+        # Else, we continue testing to see if other responses are necessary.
+        # Some of these run tests that others assume have passed.
+        response = self.handle_405(request_str)
+        if not response:
+            response = self.handle_404(request_str)
+            if not response:
+                response = self.handle_301(request_str)
+                if not response:
+                    response = self.handle_200(request_str)
         self.request.sendall(bytearray(response, 'utf-8'))
     
         
