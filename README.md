@@ -24,3 +24,8 @@ examples thus some of the code is Copyright © 2001-2013 Python
 Software Foundation; All Rights Reserved under the PSF license (GPL
 compatible) http://docs.python.org/2/library/socketserver.html
 
+
+Collaboration
+========================
+For this assignment, some discussion was had with fellow student Joseph Potentier. He joined this class a week in so this was to assist him in catching up. No code was shared between us.
+
