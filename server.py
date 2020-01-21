@@ -27,6 +27,16 @@ import os
 # try: curl -v -X GET http://127.0.0.1:8080/
 
 class MyWebServer(socketserver.BaseRequestHandler):
+
+    def get_page(self, message):
+        # Using a simple HTML template, returns a small webpage containing the message provided.
+        page = "<html><head><title>%s</title></head><body><center><h1>%s</h1></center></body></html>" % (message, message)
+        return page
+
+    def get_content_length(self, page):
+        # Given a string, returns the length of what the string will be encoded so we can share the content length.
+        return len(page.encode('utf-8'))
+
     def handle_405(self, request_str):
         # Test to determine whether or not we need to return a 405. 
         # If we should, it returns the appropriate response message.
@@ -35,7 +45,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # We just check to see if it's a GET request.
         if(request_str.split(' ')[0] == "GET"):
             return False
-        response = 'HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nConnection: close\r\n\r\n'
+        # Else, we respond with a simple HTML page saying that the method is not allowed.
+        message = "405 Method Not Allowed"
+        page = self.get_page(message)
+        content_length = self.get_content_length(page)
+        response = 'HTTP/1.1 %s\r\nAllow: GET\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, content_length, page)
         return response
 
     def handle_404(self,request_str):
@@ -53,7 +67,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if os.path.exists(path) and (os.path.abspath(path)[:len(allowed)] == allowed):
             # If the path points to a valid resource, and the absolute path leads to something in the appropriate www folder
             return False
-        response = 'HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'
+        message = "404 Not Found"
+        page = self.get_page(message)
+        content_length = self.get_content_length(page)
+        response = 'HTTP/1.1 %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, content_length, page)
         return response
 
     def handle_301(self, request_str):
@@ -65,7 +82,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
             return False # They're requesting a file that is where they say it is. So we should just be sending a 200 OK.
         if path[-1] == '/':
             return False # We just need to return the index.html from this folder. We will do this in handle_200
-        response = 'HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8080' + path[3:] + '/\r\n\r\n'
+        message = "301 Moved Permanently"
+        page = self.get_page(message)
+        content_length = self.get_content_length(page)
+        response = ('HTTP/1.1 %s\r\nLocation: ' % message) + path[4:] + ('/\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, page))
         return response
 
     def handle_200(self, request_str):
@@ -77,7 +97,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
             index_file = open((path + 'index.html'), 'r')
             index_text = index_file.read()
             index_file.close()
-            response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' + index_text
+            content_length = self.get_content_length(index_text)
+            response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, index_text)
             return response
         filetype = path.split('.')[-1]
         if filetype == 'html':
@@ -87,7 +108,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
         page_file = open(path, 'r')
         page_text = page_file.read()
         page_file.close()
-        response = 'HTTP/1.1 200 OK\r\nContent-Type: ' + mimetype + '\r\n\r\n' + page_text
+        content_length = self.get_content_length(page_text)
+        response = 'HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (mimetype, content_length, page_text)
         return response
 
     def handle(self):
