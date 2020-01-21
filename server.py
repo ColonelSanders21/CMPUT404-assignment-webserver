@@ -1,6 +1,7 @@
 #  coding: utf-8 
 import socketserver
 import os
+import time
 # Copyright 2020 Abram Hindle, Eddie Antonio Santos, Anders Johnson
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,9 +29,24 @@ import os
 
 class MyWebServer(socketserver.BaseRequestHandler):
 
+    def get_date(self):
+        # Returns string with the current date, for use with HTTP headers.
+        return time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime())
+
     def get_page(self, message):
         # Using a simple HTML template, returns a small webpage containing the message provided.
-        page = "<html><head><title>%s</title></head><body><center><h1>%s</h1></center></body></html>" % (message, message)
+        page = '''
+        <html>
+            <head>
+                <title>%s</title>
+            </head>
+            <body>
+                <center>
+                    <h1>%s</h1>
+                </center>
+            </body>
+        </html>
+        ''' % (message, message)
         return page
 
     def get_content_length(self, page):
@@ -49,7 +65,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         message = "405 Method Not Allowed"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = 'HTTP/1.1 %s\r\nAllow: GET\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, content_length, page)
+        response = 'HTTP/1.1 %s\r\nDate: %s\r\nAllow: GET\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
         return response
 
     def handle_404(self,request_str):
@@ -66,11 +82,17 @@ class MyWebServer(socketserver.BaseRequestHandler):
         path = 'www' + request_str.split()[1] # This gives a path to resource the HTTP request is requesting
         if os.path.exists(path) and (os.path.abspath(path)[:len(allowed)] == allowed):
             # If the path points to a valid resource, and the absolute path leads to something in the appropriate www folder
-            return False
+            if os.path.isfile(path):
+                # If the path requests a specific file and the filetype is not html or css, we should also return a 404. https://tools.ietf.org/html/rfc7231#section-6.5.4
+                filetype = path.split('.')[-1]
+                if filetype == 'html' or filetype == 'css':
+                    return False
+            else:
+                return False
         message = "404 Not Found"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = 'HTTP/1.1 %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, content_length, page)
+        response = 'HTTP/1.1 %s\r\nDate: %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
         return response
 
     def handle_301(self, request_str):
@@ -85,7 +107,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         message = "301 Moved Permanently"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = ('HTTP/1.1 %s\r\nLocation: ' % message) + path[4:] + ('/\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, page))
+        response = ('HTTP/1.1 %s\r\nDate: %s\r\nLocation: ' % (message, self.get_date())) + path[4:] + ('/\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, page))
         return response
 
     def handle_200(self, request_str):
@@ -98,18 +120,18 @@ class MyWebServer(socketserver.BaseRequestHandler):
             index_text = index_file.read()
             index_file.close()
             content_length = self.get_content_length(index_text)
-            response = 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, index_text)
+            response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(), content_length, index_text)
             return response
         filetype = path.split('.')[-1]
         if filetype == 'html':
             mimetype = 'text/html'
-        else:
+        elif filetype == 'css':
             mimetype = 'text/css'
         page_file = open(path, 'r')
         page_text = page_file.read()
         page_file.close()
         content_length = self.get_content_length(page_text)
-        response = 'HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (mimetype, content_length, page_text)
+        response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(),mimetype, content_length, page_text)
         return response
 
     def handle(self):
