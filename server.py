@@ -65,7 +65,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         message = "405 Method Not Allowed"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = 'HTTP/1.1 %s\r\nDate: %s\r\nAllow: GET\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
+        response = 'HTTP/1.1 %s\r\nDate: %s\r\nServer: CMPUT404a1\r\nAllow: GET\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
         return response
 
     def handle_404(self,request_str):
@@ -85,14 +85,19 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isfile(path):
                 # If the path requests a specific file and the filetype is not html or css, we should also return a 404. https://tools.ietf.org/html/rfc7231#section-6.5.4
                 filetype = path.split('.')[-1]
-                if filetype == 'html' or filetype == 'css':
+                if filetype == 'html' or filetype == 'htm' or filetype == 'css':
+                    return False
+            elif path[-1] =='/':
+                # If the path ends in a /, it requests index.html by default. If this file doesn't exist we should be returning a 404.
+                if os.path.exists(path+'index.html'):
                     return False
             else:
+                # We leave this path to be corrected by 301. If the new location path does not include index.html then a 404 will be served from the above tests.
                 return False
         message = "404 Not Found"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = 'HTTP/1.1 %s\r\nDate: %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
+        response = 'HTTP/1.1 %s\r\nDate: %s\r\nServer: CMPUT404a1\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (message, self.get_date(), content_length, page)
         return response
 
     def handle_301(self, request_str):
@@ -107,7 +112,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         message = "301 Moved Permanently"
         page = self.get_page(message)
         content_length = self.get_content_length(page)
-        response = ('HTTP/1.1 %s\r\nDate: %s\r\nLocation: ' % (message, self.get_date())) + path[4:] + ('/\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, page))
+        response = ('HTTP/1.1 %s\r\nDate: %s\r\nServer: CMPUT404a1\r\nLocation: ' % (message, self.get_date())) + path[4:] + ('/\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (content_length, page))
         return response
 
     def handle_200(self, request_str):
@@ -120,10 +125,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
             index_text = index_file.read()
             index_file.close()
             content_length = self.get_content_length(index_text)
-            response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(), content_length, index_text)
+            response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nServer: CMPUT404a1\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(), content_length, index_text)
             return response
         filetype = path.split('.')[-1]
-        if filetype == 'html':
+        if filetype == 'html' or filetype == 'htm':
             mimetype = 'text/html'
         elif filetype == 'css':
             mimetype = 'text/css'
@@ -131,7 +136,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         page_text = page_file.read()
         page_file.close()
         content_length = self.get_content_length(page_text)
-        response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(),mimetype, content_length, page_text)
+        response = 'HTTP/1.1 200 OK\r\nDate: %s\r\nServer: CMPUT404a1\r\nContent-Type: %s\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' % (self.get_date(),mimetype, content_length, page_text)
         return response
 
     def handle(self):
